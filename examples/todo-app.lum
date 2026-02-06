@@ -1,0 +1,72 @@
+// ============================================================
+// Lumina Example: Todo App
+// A simple todo list demonstrating reactive state and UI
+// ============================================================
+
+style appStyle {
+  maxWidth: 480,
+  margin: "0 auto",
+  padding: 24,
+  fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif"
+}
+
+style inputRow {
+  display: "flex",
+  gap: 8,
+  marginBottom: 16
+}
+
+component TodoApp() {
+  state todos = []
+  state inputValue = ""
+
+  fn addTodo() {
+    if inputValue != "" {
+      todos = todos.concat([{ text: inputValue, done: false }])
+      inputValue = ""
+    }
+  }
+
+  fn toggleTodo(index) {
+    todos = todos.map((todo, i) => i == index ? { text: todo.text, done: !todo.done } : todo)
+  }
+
+  fn removeTodo(index) {
+    todos = todos.filter((todo, i) => i != index)
+  }
+
+  <div class="lumina-appStyle">
+    <h1 style={({ color: "#333", marginBottom: "16px" })}>"Todo App"</h1>
+
+    <div class="lumina-inputRow">
+      <input
+        type="text"
+        placeholder="Add a new todo..."
+        value={inputValue}
+        style={({ flex: "1", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "14px" })}
+      />
+      <button
+        @click={addTodo}
+        style={({ padding: "8px 16px", background: "#4F46E5", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "14px" })}
+      >"Add"</button>
+    </div>
+
+    <div>
+      {for todo in todos {
+        <div style={({ display: "flex", alignItems: "center", padding: "8px", marginBottom: "4px", background: "#f9f9f9", borderRadius: "6px" })}>
+          <span style={({ flex: "1", textDecoration: todo.done ? "line-through" : "none", color: todo.done ? "#999" : "#333" })}>{todo.text}</span>
+          <button
+            @click={toggleTodo}
+            style={({ marginRight: "4px", padding: "4px 8px", background: "#10B981", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" })}
+          >"Done"</button>
+          <button
+            @click={removeTodo}
+            style={({ padding: "4px 8px", background: "#EF4444", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" })}
+          >"Del"</button>
+        </div>
+      }}
+    </div>
+
+    <p style={({ marginTop: "12px", color: "#999", fontSize: "13px" })}>{todos.length}" items"</p>
+  </div>
+}

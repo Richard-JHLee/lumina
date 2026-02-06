@@ -1,0 +1,39 @@
+// ============================================================
+// Lumina Example: Counter
+// The simplest reactive component
+// ============================================================
+
+component Counter(initial: Int = 0) {
+  state count = 0
+
+  fn increment() {
+    count = count + 1
+  }
+
+  fn decrement() {
+    count = count - 1
+  }
+
+  fn reset() {
+    count = 0
+  }
+
+  <div style={({ textAlign: "center", padding: "40px", fontFamily: "system-ui" })}>
+    <h1 style={({ color: "#1E293B", marginBottom: "8px" })}>"Counter"</h1>
+    <p style={({ fontSize: "64px", fontWeight: "bold", color: "#4F46E5", margin: "24px 0" })}>{count}</p>
+    <div style={({ display: "flex", gap: "8px", justifyContent: "center" })}>
+      <button
+        @click={decrement}
+        style={({ padding: "12px 24px", fontSize: "18px", background: "#EF4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" })}
+      >"-"</button>
+      <button
+        @click={reset}
+        style={({ padding: "12px 24px", fontSize: "18px", background: "#6B7280", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" })}
+      >"Reset"</button>
+      <button
+        @click={increment}
+        style={({ padding: "12px 24px", fontSize: "18px", background: "#10B981", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" })}
+      >"+"</button>
+    </div>
+  </div>
+}
