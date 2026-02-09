@@ -43,33 +43,6 @@ export class Parser {
     }
   }
 
-  // import { Button, Card } from "./components.lum"
-  private parseImport(): ASTNode {
-    this.expect(TokenType.Import);
-    this.expect(TokenType.LeftBrace);
-
-    const specifiers: string[] = [];
-    while (!this.check(TokenType.RightBrace)) {
-      specifiers.push(this.expect(TokenType.Identifier).value);
-      if (!this.match(TokenType.Comma)) break;
-      this.skipNewlines();
-    }
-
-    this.expect(TokenType.RightBrace);
-    this.expect(TokenType.From);
-    const source = this.expect(TokenType.String).value;
-    this.skipTerminator();
-
-    return { type: 'ImportDecl', specifiers, source };
-  }
-
-  // export component Button() { ... }
-  private parseExport(): ASTNode {
-    this.expect(TokenType.Export);
-    const declaration = this.parseStatement();
-    return { type: 'ExportDecl', declaration };
-  }
-
   private parseComponent(): ASTNode {
     this.expect(TokenType.Component);
     const name = this.expect(TokenType.Identifier).value;
@@ -245,7 +218,8 @@ export class Parser {
       if (this.check(TokenType.GreaterThan) || this.check(TokenType.Slash)) break;
 
       let attrName = '';
-      if (this.match(TokenType.At)) {
+      const isEvent = this.match(TokenType.At);
+      if (isEvent) {
         attrName = '@' + this.expectIdentifierOrKeyword();
       } else {
         attrName = this.expectIdentifierOrKeyword();
@@ -267,9 +241,9 @@ export class Parser {
         }
       }
 
-      // For components, store as props; for HTML elements, as attributes
-      if (isComponent && attrValue !== null) {
-        props.push({ name: attrName, value: attrValue });
+      // Components: separate props from attributes
+      if (isComponent) {
+        props.push({ name: attrName, value: attrValue || { type: 'BooleanLiteral', value: true } });
       } else {
         attributes.push({ name: attrName, value: attrValue });
       }
@@ -661,6 +635,40 @@ export class Parser {
   private skipTerminator(): void {
     this.match(TokenType.Newline) || this.match(TokenType.Semicolon);
   }
+
+  // ─── Module System ──────────────────────────────────────────
+  // import { Button, Card } from "./components.lum"
+  private parseImport(): ASTNode {
+    this.expect(TokenType.Import);
+    this.expect(TokenType.LeftBrace);
+    const specifiers: string[] = [];
+    do {
+      this.skipNewlines();
+      specifiers.push(this.expect(TokenType.Identifier).value);
+      this.skipNewlines();
+    } while (this.match(TokenType.Comma));
+    this.expect(TokenType.RightBrace);
+    this.expect(TokenType.From);
+    const source = this.expect(TokenType.String).value;
+    this.skipTerminator();
+    return { type: 'ImportDecl', specifiers, source };
+  }
+
+  // export { Button, Card }
+  private parseExport(): ASTNode {
+    this.expect(TokenType.Export);
+    this.expect(TokenType.LeftBrace);
+    const specifiers: string[] = [];
+    do {
+      this.skipNewlines();
+      specifiers.push(this.expect(TokenType.Identifier).value);
+      this.skipNewlines();
+    } while (this.match(TokenType.Comma));
+    this.expect(TokenType.RightBrace);
+    this.skipTerminator();
+    return { type: 'ExportDecl', specifiers };
+  }
+
   private error(msg: string): Error {
     const t = this.tokens[Math.min(this.pos, this.tokens.length - 1)];
     return new Error('[Parse Error] ' + msg + ' at line ' + t.line + ', col ' + t.column);

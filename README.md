@@ -29,7 +29,7 @@ Lumina는 다른 접근을 합니다. **UI, 상태, 스타일을 하나의 언�
 
 Lumina의 설계 철학은 세 가지 원칙에 기반합니다.
 
-### 1. UI는 1급 시민이다
+### 1. UI는 언어 그 자체이다.
 UI 요소가 별도의 라이브러리 호출이 아니라 언어 문법 자체입니다. `<div>`, `<button>` 같은 요소를 함수 호출처럼 자연스럽게 작성합니다. JSX가 JavaScript에 얹힌 것이라면, Lumina에서 UI는 언어 그 자체입니다.
 
 ### 2. 상태 변화는 선언적이어야 한다
@@ -40,8 +40,8 @@ UI 요소가 별도의 라이브러리 호출이 아니라 언어 문법 자체�
 
 ## Features
 
-### 핵심 기능
 - **`component`** — 컴포넌트 선언 (파라미터, 기본값 지원)
+- **컴포넌트 중첩** — 대문자로 시작하는 태그로 다른 컴포넌트 인스턴스화 (`<Button />`)
 - **`state`** — 반응형 상태 (값 변경 시 자동 리렌더링)
 - **선언적 UI** — HTML-like 문법이 언어에 내장
 - **`@event` 바인딩** — `@click={handler}` 형태의 이벤트 핸들링
@@ -50,66 +50,10 @@ UI 요소가 별도의 라이브러리 호출이 아니라 언어 문법 자체�
 - **`style` 선언** — CSS를 언어 수준에서 관리
 - **`|>` 파이프 연산자** — 함수형 데이터 변환 체이닝
 - **`effect`** — 사이드 이펙트 생명주기 관리
+- **타입 시스템** — 정적 타입 체킹 (`--typecheck` 플래그)
+- **모듈 시스템** — `import { Component } from "./file.lum"` 및 `export { Component }`
+- **최적화된 렌더링** — 선택적 DOM 업데이트 (동적 노드만 재렌더링)
 - **Kotlin/Swift 스타일 문법** — 타입 추론, 세미콜론 생략, 간결한 표현
-
-### 🆕 최근 추가된 기능
-
-#### 1. 컴포넌트 Props 전달 및 중첩 렌더링
-컴포넌트를 재사용 가능한 빌딩 블록으로 구성할 수 있습니다.
-
-```lumina
-component Button(text: String, color: String, onClick) {
-  <button @click={onClick} style={({ background: color })}>
-    {text}
-  </button>
-}
-
-component App() {
-  state count = 0
-  fn increment() { count = count + 1 }
-
-  <div>
-    <Button text="+" color="#10B981" onClick={increment} />
-  </div>
-}
-```
-
-#### 2. 정적 타입 체크
-컴파일 시 타입 안전성을 보장합니다.
-
-```bash
-# 타입 체크와 함께 컴파일
-lumina app.lum --typecheck -o app.html
-```
-
-```lumina
-component TypedButton(text: String, count: Int, onClick) {
-  <button @click={onClick}>{text}" ("{count}")"</button>
-}
-
-// 타입 에러 예시
-state count: Int = "not a number"  // ❌ Type Error!
-```
-
-지원 타입: `Int`, `String`, `Bool`, `Array`, `Object`, `Function`
-
-#### 3. 모듈 시스템 (Export)
-컴포넌트와 함수를 export하여 재사용할 수 있습니다.
-
-```lumina
-export component Button(text, onClick) {
-  <button @click={onClick}>{text}</button>
-}
-
-export component Card(title, content) {
-  <div>
-    <h3>{title}</h3>
-    <p>{content}</p>
-  </div>
-}
-```
-
-Export된 컴포넌트는 `window` 객체에 등록되어 다른 스크립트에서 사용 가능합니다.
 
 ## Quick Start
 
@@ -192,6 +136,48 @@ component Card() {
 }
 ```
 
+### Module System (Import/Export)
+
+**components.lum** — Reusable component library
+```lumina
+component Button(text: String, variant: String, @click) {
+  style buttonStyle {
+    padding: 12
+    border-radius: 8
+    background: variant == "primary" ? "#3b82f6" : "#6b7280"
+    color: "white"
+  }
+
+  <button style={buttonStyle} @click={@click}>{text}</button>
+}
+
+component Card(title: String, description: String) {
+  <div style={({ border: "1px solid #e5e7eb", padding: 24 })}>
+    <h3>{title}</h3>
+    <p>{description}</p>
+  </div>
+}
+
+export { Button, Card }
+```
+
+**app.lum** — Using imported components
+```lumina
+import { Button, Card } from "./components.lum"
+
+component App() {
+  state count = 0
+
+  fn increment() { count = count + 1 }
+
+  <div>
+    <Card title="Counter" description="Click the button to increment" />
+    <p>{count}</p>
+    <Button text="Increment" variant="primary" @click={increment} />
+  </div>
+}
+```
+
 ## Architecture
 
 ```
@@ -209,26 +195,30 @@ Source (.lum)  →  Lexer  →  Tokens  →  Parser  →  AST  →  CodeGen  →
 ## CLI Usage
 
 ```bash
-lumina <file.lum>                      # 컴파일 후 stdout 출력
-lumina <file.lum> -o out.html          # 파일로 저장
-lumina <file.lum> --typecheck          # 타입 체크 실행
-lumina <file.lum> --typecheck -o out   # 타입 체크 + 컴파일
-lumina <file.lum> --ast                # AST 출력 (디버그)
-lumina <file.lum> --tokens             # 토큰 출력 (디버그)
-lumina <file.lum> --js-only            # JavaScript만 출력
-lumina <file.lum> --css-only           # CSS만 출력
+lumina <file.lum>                # 컴파일 후 stdout 출력
+lumina <file.lum> -o out.html    # 파일로 저장
+lumina <file.lum> --typecheck    # 타입 체킹 후 컴파일
+lumina <file.lum> --ast          # AST 출력 (디버그)
+lumina <file.lum> --tokens       # 토큰 출력 (디버그)
+lumina <file.lum> --js-only      # JavaScript만 출력
+lumina <file.lum> --css-only   # CSS만 출력
 ```
 
 ## Roadmap
 
-- [x] 컴포넌트 간 Props 전달 및 중첩 컴포넌트 렌더링
-- [x] 타입 시스템 (정적 타입 체크)
-- [x] 모듈 시스템 (`export` 지원, `import`는 추후 빌드 시스템과 함께 구현 예정)
-- [ ] 가상 DOM 또는 Incremental DOM 기반 효율적 렌더링
-- [ ] Dev Server (Hot Module Replacement)
-- [ ] VS Code / IDE 확장 (문법 하이라이팅, 자동완성)
-- [ ] 서버사이드 렌더링 (SSR)
-- [ ] 패키지 매니저 연동
+### 완료 ✅ (5/8 - 62.5%)
+
+- [x] **컴포넌트 Props & 중첩 렌더링** — 대문자 태그를 컴포넌트로 인식하고 props 전달
+- [x] **타입 시스템** — 정적 타입 체킹 (`Int`, `String`, `Bool`, `Array`, `Object`)
+- [x] **모듈 시스템** — `import { Component } from "./file.lum"` 및 `export { Component }` 완벽 지원
+- [x] **선택적 DOM 업데이트** — 동적 노드만 업데이트하는 최적화 렌더링
+- [x] **기본 문법 및 트랜스파일러** — 완전한 .lum → HTML/JS/CSS 변환
+
+### 예정 📋
+
+- [ ] **Dev Server** — 파일 감시 및 Hot Module Replacement
+- [ ] **VS Code 확장** — 문법 하이라이팅, 자동완성, 오류 표시
+- [ ] **서버사이드 렌더링 (SSR)** — Node.js 환경에서 HTML 생성
 
 ## Contributing
 

@@ -10,6 +10,8 @@ export class CodeGenerator {
   private globalStatements: string[] = [];
   private imports: Array<{ specifiers: string[]; source: string }> = [];
   private exports: string[] = [];
+  private dynamicNodeId: number = 0;
+  private dynamicNodes: Array<{ id: string; expression: string }> = [];
 
   generate(program: Program): { html: string; js: string; css: string } {
     const jsChunks: string[] = [];
@@ -17,17 +19,9 @@ export class CodeGenerator {
 
     for (const node of program.body) {
       if (node.type === 'ImportDecl') {
-        this.imports.push({ specifiers: node.specifiers, source: node.source });
+        this.handleImport(node as any);
       } else if (node.type === 'ExportDecl') {
-        const exported = node.declaration;
-        if (exported.type === 'ComponentDecl') {
-          this.components.set(exported.name, true);
-          jsChunks.push(this.genComponent(exported));
-          this.exports.push(exported.name);
-        } else if (exported.type === 'FunctionDecl') {
-          jsChunks.push(this.genFunction(exported));
-          this.exports.push(exported.name);
-        }
+        this.handleExport(node as any);
       } else if (node.type === 'ComponentDecl') {
         this.components.set(node.name, true);
         jsChunks.push(this.genComponent(node));
@@ -58,6 +52,10 @@ export class CodeGenerator {
     const styles: string[] = [];
     let renderBody = '';
 
+    // Reset dynamic nodes for this component
+    this.dynamicNodeId = 0;
+    this.dynamicNodes = [];
+
     for (const child of node.body) {
       if (child.type === 'StateDecl') {
         states.push(this.genStateDecl(child, node.name));
@@ -68,9 +66,7 @@ export class CodeGenerator {
       } else if (child.type === 'StyleDecl') {
         styles.push(this.genStyleDecl(child));
       } else if (child.type === 'UIElement') {
-        renderBody = this.genUIElement(child);
-      } else if (child.type === 'ComponentInstance') {
-        renderBody = this.genComponentInstance(child);
+        renderBody = this.genUIElementOptimized(child, node.name);
       } else if (child.type === 'VariableDecl') {
         functions.push(this.genVariable(child));
       } else {
@@ -82,6 +78,16 @@ export class CodeGenerator {
       .filter((p: any) => p.defaultValue)
       .map((p: any) => `  ${p.name} = ${p.name} !== undefined ? ${p.name} : ${this.genExpr(p.defaultValue)};`)
       .join('\n');
+
+    // Generate update function for dynamic nodes
+    const updateFn = this.dynamicNodes.length > 0 ? `
+  function __updateDOM() {
+    // Update only dynamic text nodes
+${this.dynamicNodes.map(({ id, expression }) =>
+    `    const __node_${id} = __el.querySelector('[data-dyn-id="${id}"]');
+    if (__node_${id}) __node_${id}.textContent = String(${expression});`
+  ).join('\n')}
+  }` : '';
 
     return `function ${node.name}(props) {
   const __el = document.createElement('div');
@@ -95,15 +101,20 @@ ${defaultParams}
 ${states.join('\n')}
 
 ${functions.join('\n\n')}
+${updateFn}
 
   function __render() {
-    __el.innerHTML = '';
-    const __fragment = document.createDocumentFragment();
-    ${renderBody}
-    __el.appendChild(__fragment);
     if (!__mounted) {
+      // First render: build full DOM
+      __el.innerHTML = '';
+      const __fragment = document.createDocumentFragment();
+      ${renderBody}
+      __el.appendChild(__fragment);
       __mounted = true;
 ${effects.join('\n')}
+    } else {
+      // Re-render: update only dynamic nodes
+      ${this.dynamicNodes.length > 0 ? '__updateDOM();' : '__el.innerHTML = \'\'; const __fragment = document.createDocumentFragment(); ' + renderBody + ' __el.appendChild(__fragment);'}
     }
   }
 
@@ -127,7 +138,74 @@ ${effects.join('\n')}
       (function() { ${body} })();`;
   }
 
-  // ─── UI Element Generation ──────────────────────────────
+  // ─── Dynamic Text Helper ────────────────────────────────
+  private genDynamicText(expression: string, componentId: string): { code: string; id: string; varName: string } {
+    const id = `${componentId}_dyn_${this.dynamicNodeId++}`;
+    const spanVar = '__t' + Math.random().toString(36).slice(2, 7);
+    const code = `const ${spanVar} = document.createElement('span');
+    ${spanVar}.setAttribute('data-dyn-id', '${id}');
+    ${spanVar}.textContent = String(${expression});`;
+
+    // Track this dynamic node
+    this.dynamicNodes.push({ id, expression });
+
+    return { code, id, varName: spanVar };
+  }
+
+  // ─── Optimized UI Element Generation ────────────────────
+  private genUIElementOptimized(node: any, componentName: string): string {
+    const varName = '__e' + Math.random().toString(36).slice(2, 7);
+    let code = `const ${varName} = document.createElement('${node.tag}');\n`;
+
+    for (const attr of node.attributes) {
+      if (attr.name.startsWith('@')) {
+        const event = attr.name.slice(1);
+        const handler = this.genExpr(attr.value);
+        code += `    ${varName}.addEventListener('${event}', function(e) { ${handler}(e); __render(); });\n`;
+      } else if (attr.value) {
+        const val = this.genExpr(attr.value);
+        if (attr.name === 'class') {
+          code += `    ${varName}.className = ${val};\n`;
+        } else if (attr.name === 'style' && attr.value.type === 'ObjectLiteral') {
+          code += `    Object.assign(${varName}.style, ${val});\n`;
+        } else {
+          code += `    ${varName}.setAttribute('${attr.name}', ${val});\n`;
+        }
+      } else {
+        code += `    ${varName}.setAttribute('${attr.name}', '');\n`;
+      }
+    }
+
+    for (const child of node.children) {
+      if (child.type === 'UIText') {
+        code += `    ${varName}.appendChild(document.createTextNode(${JSON.stringify(child.value)}));\n`;
+      } else if (child.type === 'UIExpression') {
+        const expr = this.genExpr(child.expression);
+        const { code: dynCode, varName: dynVar } = this.genDynamicText(expr, componentName);
+        code += `    ${dynCode}\n`;
+        code += `    ${varName}.appendChild(${dynVar});\n`;
+      } else if (child.type === 'UIElement') {
+        const childCode = this.genUIElementOptimized(child, componentName);
+        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+        code += `    ${childCode}\n`;
+        code += `    ${varName}.appendChild(${childVar});\n`;
+      } else if (child.type === 'ComponentInstance') {
+        const childCode = this.genComponentInstance(child);
+        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+        code += `    ${childCode}\n`;
+        code += `    ${varName}.appendChild(${childVar});\n`;
+      } else if (child.type === 'IfStatement') {
+        code += this.genUIConditional(child, varName);
+      } else if (child.type === 'ForStatement') {
+        code += this.genUILoop(child, varName);
+      }
+    }
+
+    code += `    __fragment.appendChild(${varName});`;
+    return code;
+  }
+
+  // ─── UI Element Generation (레거시) ──────────────────────────────
   private genUIElement(node: any): string {
     const varName = '__e' + Math.random().toString(36).slice(2, 7);
     let code = `const ${varName} = document.createElement('${node.tag}');\n`;
@@ -163,11 +241,6 @@ ${effects.join('\n')}
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `    ${childCode}\n`;
         code += `    ${varName}.appendChild(${childVar});\n`;
-      } else if (child.type === 'ComponentInstance') {
-        const childCode = this.genComponentInstance(child);
-        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
-        code += `    ${childCode}\n`;
-        code += `    ${varName}.appendChild(${childVar});\n`;
       } else if (child.type === 'IfStatement') {
         code += this.genUIConditional(child, varName);
       } else if (child.type === 'ForStatement') {
@@ -179,30 +252,12 @@ ${effects.join('\n')}
     return code;
   }
 
-  // ─── Component Instance Generation ─────────────────────
-  private genComponentInstance(node: any): string {
-    const varName = '__c' + Math.random().toString(36).slice(2, 7);
-
-    // Generate props object
-    const propsObj = node.props.length > 0
-      ? '{ ' + node.props.map((p: any) => `${p.name}: ${this.genExpr(p.value)}`).join(', ') + ' }'
-      : '{}';
-
-    let code = `const ${varName} = ${node.name}(${propsObj});`;
-    return code;
-  }
-
   private genUIConditional(node: any, parentVar: string): string {
     const cond = this.genExpr(node.condition);
     let code = `    if (${cond}) {\n`;
     for (const child of node.consequent) {
       if (child.type === 'UIElement') {
         const childCode = this.genUIElement(child);
-        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
-        code += `      ${childCode}\n`;
-        code += `      ${parentVar}.appendChild(${childVar});\n`;
-      } else if (child.type === 'ComponentInstance') {
-        const childCode = this.genComponentInstance(child);
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `      ${childCode}\n`;
         code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -218,11 +273,6 @@ ${effects.join('\n')}
       for (const child of node.alternate) {
         if (child.type === 'UIElement') {
           const childCode = this.genUIElement(child);
-          const childVar = childCode.match(/const (\w+)/)?.[1] || '';
-          code += `      ${childCode}\n`;
-          code += `      ${parentVar}.appendChild(${childVar});\n`;
-        } else if (child.type === 'ComponentInstance') {
-          const childCode = this.genComponentInstance(child);
           const childVar = childCode.match(/const (\w+)/)?.[1] || '';
           code += `      ${childCode}\n`;
           code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -242,11 +292,6 @@ ${effects.join('\n')}
     for (const child of node.body) {
       if (child.type === 'UIElement') {
         const childCode = this.genUIElement(child);
-        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
-        code += `      ${childCode}\n`;
-        code += `      ${parentVar}.appendChild(${childVar});\n`;
-      } else if (child.type === 'ComponentInstance') {
-        const childCode = this.genComponentInstance(child);
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `      ${childCode}\n`;
         code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -380,9 +425,8 @@ ${effects.join('\n')}
 
   // ─── HTML Wrapper ──────────────────────────────────────
   private generateHTML(js: string, css: string): string {
-    // Find the last component to auto-mount (usually the main app component)
-    const componentKeys = Array.from(this.components.keys());
-    const mainComponent = componentKeys[componentKeys.length - 1] || '';
+    // Find the first component to auto-mount
+    const firstComponent = Array.from(this.components.keys())[0] || '';
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -401,32 +445,72 @@ ${css ? css.split('\n').map(l => '    ' + l).join('\n') : ''}
 ${js}
 
 // Auto-mount
-${mainComponent ? `document.getElementById('app').appendChild(${mainComponent}({}));` : ''}
+${firstComponent ? `document.getElementById('app').appendChild(${firstComponent}({}));` : ''}
   </script>
 </body>
 </html>`;
   }
 
-  private wrapRuntime(js: string): string {
-    let code = `// Lumina Runtime v0.1
-// Generated by Lumina Transpiler
+  // ─── Module System ──────────────────────────────────────────
+  private handleImport(node: any): void {
+    // Track imported components
+    this.imports.push({
+      specifiers: node.specifiers,
+      source: node.source
+    });
+    // Mark them as available components
+    for (const spec of node.specifiers) {
+      this.components.set(spec, true);
+    }
+  }
 
-`;
+  private handleExport(node: any): void {
+    // Track exported components
+    this.exports.push(...node.specifiers);
+  }
 
-    // Note: For full module support, compile each .lum file separately
-    // and use ES6 import/export. For now, we use a simple global approach.
+  private genComponentInstance(node: any): string {
+    // Generate props object
+    const propsObj: string[] = [];
+    for (const prop of node.props) {
+      const key = prop.name.startsWith('@') ? prop.name.slice(1) : prop.name;
+      const value = prop.value ? this.genExpr(prop.value) : 'true';
+      propsObj.push(`${key}: ${value}`);
+    }
+    const propsStr = propsObj.length > 0 ? `{ ${propsObj.join(', ')} }` : '{}';
 
-    code += js;
-
-    // Export components/functions to global scope if needed
-    if (this.exports.length > 0) {
-      code += '\n\n// Exports\n';
-      for (const name of this.exports) {
-        code += `if (typeof window !== 'undefined') window.${name} = ${name};\n`;
-      }
+    // Generate children array if any
+    let childrenStr = '';
+    if (node.children.length > 0) {
+      const childCode = node.children.map((child: any) => {
+        if (child.type === 'UIText') {
+          return JSON.stringify(child.value);
+        } else if (child.type === 'UIExpression') {
+          return this.genExpr(child.expression);
+        } else if (child.type === 'UIElement') {
+          return `document.createElement('${child.tag}')`;
+        } else if (child.type === 'ComponentInstance') {
+          return `${child.name}({})`;
+        }
+        return '""';
+      }).join(', ');
+      childrenStr = `, children: [${childCode}]`;
     }
 
-    return code;
+    const varName = '__c' + Math.random().toString(36).slice(2, 7);
+    return `const ${varName} = ${node.name}({ ...${propsStr}${childrenStr} });`;
+  }
+
+  private wrapRuntime(js: string): string {
+    // Add export statements at the end
+    const exportCode = this.exports.length > 0
+      ? `\n// Exports\n${this.exports.map(name => `window.${name} = ${name};`).join('\n')}`
+      : '';
+
+    return `// Lumina Runtime v0.1
+// Generated by Lumina Transpiler
+
+${js}${exportCode}`;
   }
 }
 

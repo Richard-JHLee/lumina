@@ -1,0 +1,63 @@
+// module-import.lum - Using imported components
+import { Button, Card } from "./components.lum"
+
+component App() {
+  state count = 0
+
+  fn increment() {
+    count = count + 1
+  }
+
+  fn decrement() {
+    count = count - 1
+  }
+
+  style appStyle {
+    padding: 32
+    maxWidth: 600
+    margin: "0 auto"
+    fontFamily: "Arial, sans-serif"
+  }
+
+  style headerStyle {
+    fontSize: 32
+    fontWeight: "bold"
+    marginBottom: 24
+    textAlign: "center"
+    color: "#1f2937"
+  }
+
+  style countStyle {
+    fontSize: 48
+    fontWeight: "bold"
+    textAlign: "center"
+    color: "#3b82f6"
+    margin: 32
+  }
+
+  style buttonsStyle {
+    display: "flex"
+    justifyContent: "center"
+    gap: 16
+    marginBottom: 32
+  }
+
+  <div style={appStyle}>
+    <div style={headerStyle}>Module Import Demo</div>
+
+    <Card
+      title="Counter Component"
+      description="This example demonstrates importing and using reusable components from another file." />
+
+    <div style={countStyle}>{count}</div>
+
+    <div style={buttonsStyle}>
+      <Button text="Decrement" variant="secondary" @click={decrement} />
+      <Button text="Increment" variant="primary" @click={increment} />
+    </div>
+
+    <Card
+      title="How it works"
+      description="The Button and Card components are defined in components.lum, exported, and then imported here. This promotes code reusability and modularity." />
+  </div>
+}

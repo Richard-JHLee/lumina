@@ -1,6 +1,6 @@
 {
   "name": "lumina-lang",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lumina - A fast frontend language with built-in reactive UI",
   "main": "dist/index.js",
   "bin": {
@@ -12,5 +12,10 @@
     "dev": "ts-node src/bin/lumina.ts"
   },
   "keywords": ["language", "frontend", "ui", "reactive"],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
 }

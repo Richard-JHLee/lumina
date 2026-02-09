@@ -82,8 +82,6 @@ export interface Token {
 // ─── AST Node Types ─────────────────────────────────────────
 export type ASTNode =
   | Program
-  | ImportDecl
-  | ExportDecl
   | ComponentDecl
   | FunctionDecl
   | VariableDecl
@@ -96,7 +94,6 @@ export type ASTNode =
   | ExpressionStatement
   | BlockStatement
   | UIElement
-  | ComponentInstance
   | UIText
   | UIExpression
   | BinaryExpr
@@ -115,24 +112,14 @@ export type ASTNode =
   | TemplateLiteral
   | EventHandler
   | ConditionalExpr
-  | PipeExpr;
+  | PipeExpr
+  | ImportDecl
+  | ExportDecl
+  | ComponentInstance;
 
 export interface Program {
   type: 'Program';
   body: ASTNode[];
-}
-
-// import { Button, Card } from "./components.lum"
-export interface ImportDecl {
-  type: 'ImportDecl';
-  specifiers: string[];  // Names to import
-  source: string;        // File path
-}
-
-// export component Button() { ... }
-export interface ExportDecl {
-  type: 'ExportDecl';
-  declaration: ASTNode;  // What to export
 }
 
 // component Counter(initial: Int) { ... }
@@ -236,15 +223,6 @@ export interface UIElement {
 export interface UIAttribute {
   name: string;
   value: ASTNode | null;  // null for boolean attrs like `disabled`
-}
-
-// <Counter initial={5} />
-export interface ComponentInstance {
-  type: 'ComponentInstance';
-  name: string;
-  props: { name: string; value: ASTNode }[];
-  children: ASTNode[];
-  selfClosing: boolean;
 }
 
 export interface UIText {
@@ -352,4 +330,27 @@ export interface PipeExpr {
   type: 'PipeExpr';
   left: ASTNode;
   right: ASTNode;
+}
+
+// ─── Module System ──────────────────────────────────────────
+// import { Button, Card } from "./components.lum"
+export interface ImportDecl {
+  type: 'ImportDecl';
+  specifiers: string[];  // ["Button", "Card"]
+  source: string;        // "./components.lum"
+}
+
+// export { Button, Card }
+export interface ExportDecl {
+  type: 'ExportDecl';
+  specifiers: string[];  // ["Button", "Card"]
+}
+
+// <Button text="Click me" @click={handleClick} />
+export interface ComponentInstance {
+  type: 'ComponentInstance';
+  name: string;
+  props: { name: string; value: ASTNode }[];
+  children: ASTNode[];
+  selfClosing: boolean;
 }

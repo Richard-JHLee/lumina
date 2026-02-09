@@ -23,7 +23,6 @@ function main() {
     -o, --output <file>   Output file path (default: stdout)
     --ast                 Print AST as JSON
     --tokens              Print token list
-    --typecheck           Run type checker (errors will prevent compilation)
     --js-only             Output only JavaScript
     --css-only            Output only CSS
     -h, --help            Show this help
@@ -61,31 +60,6 @@ function main() {
   }
 
   try {
-    // Type checking
-    if (args.includes('--typecheck')) {
-      const { Lexer } = require('../lexer');
-      const { Parser } = require('../parser');
-      const { TypeChecker } = require('../typechecker');
-
-      const lexer = new Lexer(source);
-      const tokens = lexer.tokenize();
-      const parser = new Parser(tokens);
-      const ast = parser.parse();
-
-      const checker = new TypeChecker();
-      const typeResult = checker.check(ast);
-
-      if (!typeResult.success) {
-        console.error('Type checking failed:');
-        for (const error of typeResult.errors) {
-          console.error('  ' + error);
-        }
-        process.exit(1);
-      }
-
-      console.log('✓ Type checking passed');
-    }
-
     const result = compile(source);
 
     // Determine output
