@@ -5,21 +5,84 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { compile } from '../index';
+import { DevServer } from '../devserver';
+import { renderToString } from '../ssr';
+import { Lexer } from '../lexer';
+import { Parser } from '../parser';
 
 function main() {
   const args = process.argv.slice(2);
 
+  // SSR command
+  if (args[0] === 'ssr') {
+    const inputFile = args[1];
+    if (!inputFile || !fs.existsSync(inputFile)) {
+      console.error('Error: File not found: ' + inputFile);
+      process.exit(1);
+    }
+
+    const source = fs.readFileSync(inputFile, 'utf-8');
+    const lexer = new Lexer(source);
+    const tokens = lexer.tokenize();
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    const componentName = args.includes('--component')
+      ? args[args.indexOf('--component') + 1]
+      : (ast.body.find((node: any) => node.type === 'ComponentDecl') as any)?.name;
+
+    if (!componentName) {
+      console.error('Error: No component found. Use --component <name>');
+      process.exit(1);
+    }
+
+    const propsJson = args.includes('--props') ? args[args.indexOf('--props') + 1] : '{}';
+    const props = JSON.parse(propsJson);
+
+    const html = renderToString(ast, componentName, props);
+    console.log(html);
+    return;
+  }
+
+  // Dev Server command
+  if (args[0] === 'serve' || args[0] === 'dev') {
+    const port = args.includes('--port') ? parseInt(args[args.indexOf('--port') + 1]) : 3000;
+    const watch = args.includes('--watch') ? args[args.indexOf('--watch') + 1].split(',') : ['examples'];
+    const output = args.includes('--output') ? args[args.indexOf('--output') + 1] : 'output';
+
+    const server = new DevServer({ port, watch, output });
+
+    // Handle Ctrl+C
+    process.on('SIGINT', () => {
+      server.stop();
+      process.exit(0);
+    });
+
+    server.start();
+    return;
+  }
+
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-  Lumina Compiler v0.1.0
+  Lumina Compiler v0.2.0
 
   Usage:
     lumina <file.lum>              Compile and output HTML
     lumina <file.lum> -o <out>     Compile and write to output file
-    lumina <file.lum> --ast        Print AST (debug)
-    lumina <file.lum> --tokens     Print tokens (debug)
+    lumina serve                   Start dev server with hot reload
+    lumina ssr <file.lum>          Render component to HTML (SSR)
 
-  Options:
+  Commands:
+    serve, dev                Start development server
+      --port <number>         Server port (default: 3000)
+      --watch <dirs>          Directories to watch (default: examples)
+      --output <dir>          Output directory (default: output)
+
+    ssr <file.lum>            Server-side rendering
+      --component <name>      Component to render (default: first component)
+      --props <json>          Props as JSON string (default: {})
+
+  Compile Options:
     -o, --output <file>   Output file path (default: stdout)
     --ast                 Print AST as JSON
     --tokens              Print token list

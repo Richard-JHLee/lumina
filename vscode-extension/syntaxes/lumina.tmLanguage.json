@@ -1,0 +1,161 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Lumina",
+  "scopeName": "source.lumina",
+  "patterns": [
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#comments" },
+    { "include": "#numbers" },
+    { "include": "#components" },
+    { "include": "#functions" },
+    { "include": "#tags" },
+    { "include": "#attributes" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.lumina",
+          "match": "\\b(component|fn|let|var|state|effect|style|if|else|for|in|return|import|export|from)\\b"
+        },
+        {
+          "name": "keyword.other.lumina",
+          "match": "\\b(emit|on)\\b"
+        },
+        {
+          "name": "constant.language.lumina",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lumina",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lumina",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.embedded.expression.lumina",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "patterns": [
+                { "include": "#expression" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.lumina",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.lumina",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.lumina",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "components": {
+      "patterns": [
+        {
+          "name": "entity.name.type.component.lumina",
+          "match": "\\b[A-Z][a-zA-Z0-9]*\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.lumina",
+          "match": "\\b(fn|component|style|effect)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.lumina" },
+            "2": { "name": "entity.name.function.lumina" }
+          }
+        }
+      ]
+    },
+    "tags": {
+      "patterns": [
+        {
+          "name": "meta.tag.lumina",
+          "begin": "<([a-zA-Z][a-zA-Z0-9]*)",
+          "beginCaptures": {
+            "1": { "name": "entity.name.tag.lumina" }
+          },
+          "end": "/?>",
+          "patterns": [
+            { "include": "#attributes" }
+          ]
+        },
+        {
+          "name": "meta.tag.lumina",
+          "begin": "</([a-zA-Z][a-zA-Z0-9]*)",
+          "beginCaptures": {
+            "1": { "name": "entity.name.tag.lumina" }
+          },
+          "end": ">"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "meta.attribute.event.lumina",
+          "match": "@([a-zA-Z][a-zA-Z0-9]*)",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.event.lumina" }
+          }
+        },
+        {
+          "name": "entity.other.attribute-name.lumina",
+          "match": "\\b([a-zA-Z][a-zA-Z0-9-]*)(?==)"
+        },
+        {
+          "name": "meta.embedded.expression.lumina",
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.lumina",
+          "match": "(\\+|-|\\*|/|%|==|!=|<=|>=|<|>|&&|\\|\\||!|=|\\|>)"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#keywords" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#components" },
+        { "include": "#operators" }
+      ]
+    }
+  }
+}

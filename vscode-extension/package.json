@@ -1,0 +1,43 @@
+{
+  "name": "lumina",
+  "displayName": "Lumina Language Support",
+  "description": "Syntax highlighting and language support for Lumina",
+  "version": "0.2.0",
+  "publisher": "lumina-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Richard-JHLee/lumina"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lumina",
+        "aliases": [
+          "Lumina",
+          "lumina"
+        ],
+        "extensions": [
+          ".lum"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark": "./icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lumina",
+        "scopeName": "source.lumina",
+        "path": "./syntaxes/lumina.tmLanguage.json"
+      }
+    ]
+  }
+}

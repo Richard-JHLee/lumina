@@ -40,6 +40,7 @@ UI 요소가 별도의 라이브러리 호출이 아니라 언어 문법 자체�
 
 ## Features
 
+### 언어 기능
 - **`component`** — 컴포넌트 선언 (파라미터, 기본값 지원)
 - **컴포넌트 중첩** — 대문자로 시작하는 태그로 다른 컴포넌트 인스턴스화 (`<Button />`)
 - **`state`** — 반응형 상태 (값 변경 시 자동 리렌더링)
@@ -52,7 +53,12 @@ UI 요소가 별도의 라이브러리 호출이 아니라 언어 문법 자체�
 - **`effect`** — 사이드 이펙트 생명주기 관리
 - **타입 시스템** — 정적 타입 체킹 (`--typecheck` 플래그)
 - **모듈 시스템** — `import { Component } from "./file.lum"` 및 `export { Component }`
+
+### 개발 도구
 - **최적화된 렌더링** — 선택적 DOM 업데이트 (동적 노드만 재렌더링)
+- **Dev Server** — 파일 감시, 자동 재컴파일, Live Reload
+- **VS Code 확장** — 문법 하이라이팅, 자동 완성, 괄호 매칭
+- **SSR (Server-Side Rendering)** — Node.js 환경에서 HTML 생성
 - **Kotlin/Swift 스타일 문법** — 타입 추론, 세미콜론 생략, 간결한 표현
 
 ## Quick Start
@@ -194,6 +200,8 @@ Source (.lum)  →  Lexer  →  Tokens  →  Parser  →  AST  →  CodeGen  →
 
 ## CLI Usage
 
+### Compile
+
 ```bash
 lumina <file.lum>                # 컴파일 후 stdout 출력
 lumina <file.lum> -o out.html    # 파일로 저장
@@ -201,24 +209,47 @@ lumina <file.lum> --typecheck    # 타입 체킹 후 컴파일
 lumina <file.lum> --ast          # AST 출력 (디버그)
 lumina <file.lum> --tokens       # 토큰 출력 (디버그)
 lumina <file.lum> --js-only      # JavaScript만 출력
+```
+
+### Dev Server
+
+```bash
+lumina serve                     # Dev server 시작 (http://localhost:3000)
+lumina dev                       # serve의 별칭
+lumina serve --port 8080         # 포트 변경
+lumina serve --watch src,examples --output dist  # 디렉토리 설정
+```
+
+**Features**:
+- 🔥 파일 변경 감지 및 자동 재컴파일
+- 🔄 Live Reload (자동 새로고침)
+- 📁 디렉토리 리스팅
+- ⚡ 빠른 개발 워크플로우
+
+### Server-Side Rendering
+
+```bash
+lumina ssr examples/counter.lum                    # SSR 렌더링
+lumina ssr app.lum --component App                 # 특정 컴포넌트
+lumina ssr app.lum --props '{"count":10}'          # Props 전달
+```
 lumina <file.lum> --css-only   # CSS만 출력
 ```
 
 ## Roadmap
 
-### 완료 ✅ (5/8 - 62.5%)
+### ✅ 완료 (8/8 - 100%)
 
 - [x] **컴포넌트 Props & 중첩 렌더링** — 대문자 태그를 컴포넌트로 인식하고 props 전달
 - [x] **타입 시스템** — 정적 타입 체킹 (`Int`, `String`, `Bool`, `Array`, `Object`)
 - [x] **모듈 시스템** — `import { Component } from "./file.lum"` 및 `export { Component }` 완벽 지원
 - [x] **선택적 DOM 업데이트** — 동적 노드만 업데이트하는 최적화 렌더링
 - [x] **기본 문법 및 트랜스파일러** — 완전한 .lum → HTML/JS/CSS 변환
+- [x] **Dev Server** — 파일 감시 및 자동 재컴파일, Live Reload
+- [x] **VS Code 확장** — 문법 하이라이팅, 자동 완성, 괄호 매칭
+- [x] **서버사이드 렌더링 (SSR)** — Node.js 환경에서 HTML 생성
 
-### 예정 📋
-
-- [ ] **Dev Server** — 파일 감시 및 Hot Module Replacement
-- [ ] **VS Code 확장** — 문법 하이라이팅, 자동완성, 오류 표시
-- [ ] **서버사이드 렌더링 (SSR)** — Node.js 환경에서 HTML 생성
+🎉 **Lumina v0.2.0 - 모든 핵심 기능 구현 완료!**
 
 ## Contributing
 
