@@ -1,0 +1,58 @@
+// ============================================================
+// Lumina Example: Module Export
+// Demonstrates exporting components for reuse
+// ============================================================
+
+// Export a reusable Button component
+export component Button(text: String, color: String, onClick) {
+  <button
+    @click={onClick}
+    style={({
+      padding: "10px 20px",
+      background: color,
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontSize: "14px",
+      fontWeight: "600"
+    })}
+  >{text}</button>
+}
+
+// Export a Card component
+export component Card(title: String, content: String) {
+  <div style={({
+    padding: "20px",
+    border: "1px solid #e0e0e0",
+    borderRadius: "8px",
+    background: "white",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+  })}>
+    <h3 style={({ marginBottom: "12px", color: "#333" })}>{title}</h3>
+    <p style={({ color: "#666", lineHeight: "1.5" })}>{content}</p>
+  </div>
+}
+
+// Main app component (not exported)
+component App() {
+  state count: Int = 0
+
+  fn increment() {
+    count = count + 1
+  }
+
+  <div style={({ padding: "40px", maxWidth: "600px", margin: "0 auto" })}>
+    <h1 style={({ marginBottom: "24px" })}>"Module System Demo"</h1>
+
+    <Card
+      title="Counter"
+      content="Click the button to increment the counter"
+    />
+
+    <div style={({ marginTop: "16px", textAlign: "center" })}>
+      <p style={({ fontSize: "32px", fontWeight: "bold", marginBottom: "16px" })}>{count}</p>
+      <Button text="Increment" color="#4F46E5" onClick={increment} />
+    </div>
+  </div>
+}

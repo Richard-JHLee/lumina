@@ -8,13 +8,27 @@ export class CodeGenerator {
   private components: Map<string, boolean> = new Map();
   private styles: Map<string, string> = new Map();
   private globalStatements: string[] = [];
+  private imports: Array<{ specifiers: string[]; source: string }> = [];
+  private exports: string[] = [];
 
   generate(program: Program): { html: string; js: string; css: string } {
     const jsChunks: string[] = [];
     const cssChunks: string[] = [];
 
     for (const node of program.body) {
-      if (node.type === 'ComponentDecl') {
+      if (node.type === 'ImportDecl') {
+        this.imports.push({ specifiers: node.specifiers, source: node.source });
+      } else if (node.type === 'ExportDecl') {
+        const exported = node.declaration;
+        if (exported.type === 'ComponentDecl') {
+          this.components.set(exported.name, true);
+          jsChunks.push(this.genComponent(exported));
+          this.exports.push(exported.name);
+        } else if (exported.type === 'FunctionDecl') {
+          jsChunks.push(this.genFunction(exported));
+          this.exports.push(exported.name);
+        }
+      } else if (node.type === 'ComponentDecl') {
         this.components.set(node.name, true);
         jsChunks.push(this.genComponent(node));
       } else if (node.type === 'StyleDecl') {
@@ -55,6 +69,8 @@ export class CodeGenerator {
         styles.push(this.genStyleDecl(child));
       } else if (child.type === 'UIElement') {
         renderBody = this.genUIElement(child);
+      } else if (child.type === 'ComponentInstance') {
+        renderBody = this.genComponentInstance(child);
       } else if (child.type === 'VariableDecl') {
         functions.push(this.genVariable(child));
       } else {
@@ -147,6 +163,11 @@ ${effects.join('\n')}
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `    ${childCode}\n`;
         code += `    ${varName}.appendChild(${childVar});\n`;
+      } else if (child.type === 'ComponentInstance') {
+        const childCode = this.genComponentInstance(child);
+        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+        code += `    ${childCode}\n`;
+        code += `    ${varName}.appendChild(${childVar});\n`;
       } else if (child.type === 'IfStatement') {
         code += this.genUIConditional(child, varName);
       } else if (child.type === 'ForStatement') {
@@ -158,12 +179,30 @@ ${effects.join('\n')}
     return code;
   }
 
+  // ─── Component Instance Generation ─────────────────────
+  private genComponentInstance(node: any): string {
+    const varName = '__c' + Math.random().toString(36).slice(2, 7);
+
+    // Generate props object
+    const propsObj = node.props.length > 0
+      ? '{ ' + node.props.map((p: any) => `${p.name}: ${this.genExpr(p.value)}`).join(', ') + ' }'
+      : '{}';
+
+    let code = `const ${varName} = ${node.name}(${propsObj});`;
+    return code;
+  }
+
   private genUIConditional(node: any, parentVar: string): string {
     const cond = this.genExpr(node.condition);
     let code = `    if (${cond}) {\n`;
     for (const child of node.consequent) {
       if (child.type === 'UIElement') {
         const childCode = this.genUIElement(child);
+        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+        code += `      ${childCode}\n`;
+        code += `      ${parentVar}.appendChild(${childVar});\n`;
+      } else if (child.type === 'ComponentInstance') {
+        const childCode = this.genComponentInstance(child);
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `      ${childCode}\n`;
         code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -179,6 +218,11 @@ ${effects.join('\n')}
       for (const child of node.alternate) {
         if (child.type === 'UIElement') {
           const childCode = this.genUIElement(child);
+          const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+          code += `      ${childCode}\n`;
+          code += `      ${parentVar}.appendChild(${childVar});\n`;
+        } else if (child.type === 'ComponentInstance') {
+          const childCode = this.genComponentInstance(child);
           const childVar = childCode.match(/const (\w+)/)?.[1] || '';
           code += `      ${childCode}\n`;
           code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -198,6 +242,11 @@ ${effects.join('\n')}
     for (const child of node.body) {
       if (child.type === 'UIElement') {
         const childCode = this.genUIElement(child);
+        const childVar = childCode.match(/const (\w+)/)?.[1] || '';
+        code += `      ${childCode}\n`;
+        code += `      ${parentVar}.appendChild(${childVar});\n`;
+      } else if (child.type === 'ComponentInstance') {
+        const childCode = this.genComponentInstance(child);
         const childVar = childCode.match(/const (\w+)/)?.[1] || '';
         code += `      ${childCode}\n`;
         code += `      ${parentVar}.appendChild(${childVar});\n`;
@@ -331,8 +380,9 @@ ${effects.join('\n')}
 
   // ─── HTML Wrapper ──────────────────────────────────────
   private generateHTML(js: string, css: string): string {
-    // Find the first component to auto-mount
-    const firstComponent = Array.from(this.components.keys())[0] || '';
+    // Find the last component to auto-mount (usually the main app component)
+    const componentKeys = Array.from(this.components.keys());
+    const mainComponent = componentKeys[componentKeys.length - 1] || '';
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -351,17 +401,32 @@ ${css ? css.split('\n').map(l => '    ' + l).join('\n') : ''}
 ${js}
 
 // Auto-mount
-${firstComponent ? `document.getElementById('app').appendChild(${firstComponent}({}));` : ''}
+${mainComponent ? `document.getElementById('app').appendChild(${mainComponent}({}));` : ''}
   </script>
 </body>
 </html>`;
   }
 
   private wrapRuntime(js: string): string {
-    return `// Lumina Runtime v0.1
+    let code = `// Lumina Runtime v0.1
 // Generated by Lumina Transpiler
 
-${js}`;
+`;
+
+    // Note: For full module support, compile each .lum file separately
+    // and use ES6 import/export. For now, we use a simple global approach.
+
+    code += js;
+
+    // Export components/functions to global scope if needed
+    if (this.exports.length > 0) {
+      code += '\n\n// Exports\n';
+      for (const name of this.exports) {
+        code += `if (typeof window !== 'undefined') window.${name} = ${name};\n`;
+      }
+    }
+
+    return code;
   }
 }
 

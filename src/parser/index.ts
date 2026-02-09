@@ -25,6 +25,8 @@ export class Parser {
   // ─── Statements ─────────────────────────────────────────
   private parseStatement(): ASTNode {
     switch (this.current().type) {
+      case TokenType.Import: return this.parseImport();
+      case TokenType.Export: return this.parseExport();
       case TokenType.Component: return this.parseComponent();
       case TokenType.Fn: return this.parseFunction();
       case TokenType.Let: return this.parseVariable(false);
@@ -39,6 +41,33 @@ export class Parser {
         if (this.isUIElement()) return this.parseUIElement();
         return this.parseExpressionStatement();
     }
+  }
+
+  // import { Button, Card } from "./components.lum"
+  private parseImport(): ASTNode {
+    this.expect(TokenType.Import);
+    this.expect(TokenType.LeftBrace);
+
+    const specifiers: string[] = [];
+    while (!this.check(TokenType.RightBrace)) {
+      specifiers.push(this.expect(TokenType.Identifier).value);
+      if (!this.match(TokenType.Comma)) break;
+      this.skipNewlines();
+    }
+
+    this.expect(TokenType.RightBrace);
+    this.expect(TokenType.From);
+    const source = this.expect(TokenType.String).value;
+    this.skipTerminator();
+
+    return { type: 'ImportDecl', specifiers, source };
+  }
+
+  // export component Button() { ... }
+  private parseExport(): ASTNode {
+    this.expect(TokenType.Export);
+    const declaration = this.parseStatement();
+    return { type: 'ExportDecl', declaration };
   }
 
   private parseComponent(): ASTNode {
@@ -204,7 +233,11 @@ export class Parser {
     this.expect(TokenType.LessThan);
     const tag = this.expect(TokenType.Identifier).value;
 
+    // Check if this is a component (starts with uppercase)
+    const isComponent = /^[A-Z]/.test(tag);
+
     const attributes: UIAttribute[] = [];
+    const props: { name: string; value: ASTNode }[] = [];
     this.skipNewlines();
 
     while (!this.check(TokenType.GreaterThan) && !this.check(TokenType.Slash) && !this.isAtEnd()) {
@@ -233,13 +266,22 @@ export class Parser {
           attrValue = this.parseExpression();
         }
       }
-      attributes.push({ name: attrName, value: attrValue });
+
+      // For components, store as props; for HTML elements, as attributes
+      if (isComponent && attrValue !== null) {
+        props.push({ name: attrName, value: attrValue });
+      } else {
+        attributes.push({ name: attrName, value: attrValue });
+      }
       this.skipNewlines();
     }
 
     // Self-closing?
     if (this.match(TokenType.Slash)) {
       this.expect(TokenType.GreaterThan);
+      if (isComponent) {
+        return { type: 'ComponentInstance', name: tag, props, children: [], selfClosing: true };
+      }
       return { type: 'UIElement', tag, attributes, children: [], selfClosing: true };
     }
 
@@ -292,6 +334,9 @@ export class Parser {
     }
     this.expect(TokenType.GreaterThan);
 
+    if (isComponent) {
+      return { type: 'ComponentInstance', name: tag, props, children, selfClosing: false };
+    }
     return { type: 'UIElement', tag, attributes, children, selfClosing: false };
   }
 

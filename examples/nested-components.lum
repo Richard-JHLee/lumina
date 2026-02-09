@@ -1,0 +1,61 @@
+// ============================================================
+// Lumina Example: Nested Components
+// Demonstrates component composition and props passing
+// ============================================================
+
+component Button(text, color, onClick) {
+  <button
+    @click={onClick}
+    style={({
+      padding: "12px 24px",
+      fontSize: "16px",
+      background: color,
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      cursor: "pointer",
+      fontWeight: "bold"
+    })}
+  >{text}</button>
+}
+
+component Counter() {
+  state count = 0
+
+  fn increment() {
+    count = count + 1
+  }
+
+  fn decrement() {
+    count = count - 1
+  }
+
+  fn reset() {
+    count = 0
+  }
+
+  <div style={({
+    textAlign: "center",
+    padding: "40px",
+    fontFamily: "system-ui",
+    maxWidth: "400px",
+    margin: "0 auto"
+  })}>
+    <h1 style={({ color: "#1E293B", marginBottom: "16px" })}>"Component Demo"</h1>
+    <p style={({
+      fontSize: "64px",
+      fontWeight: "bold",
+      color: "#4F46E5",
+      margin: "32px 0"
+    })}>{count}</p>
+    <div style={({
+      display: "flex",
+      gap: "12px",
+      justifyContent: "center"
+    })}>
+      <Button text="-" color="#EF4444" onClick={decrement} />
+      <Button text="Reset" color="#6B7280" onClick={reset} />
+      <Button text="+" color="#10B981" onClick={increment} />
+    </div>
+  </div>
+}
